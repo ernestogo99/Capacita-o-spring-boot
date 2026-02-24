@@ -1,0 +1,685 @@
+# Capacitação Spring boot 
+
+O objetivo dessa capacitação é ensinar como criar uma api em spring boot utilizando boas práticas
+
+## O que é o spring Boot?
+Spring Boot é um framework que facilita a criação de aplicações Java baseadas no Spring, principalmente APIs e aplicações web, com o mínimo de configuração manual.
+
+
+## Como criar um projeto em java com spring boot
+
+Basta ir no site spring initializer e escolher as configurações e dependências
+
+````sh 
+https://start.spring.io/
+````
+
+- dependências: são bibliotecas que ajudam no desenvolvimento e ficam no arquivo pom.xml (MAVEN)
+
+nessa capacitação utilizamos as seguintes dependências:
+
+- Spring Boot DevTools: ferramenta que melhora a produtividade no desenvolvimento, permitindo reinicialização automática da aplicação a cada alteração no código.
+
+- Lombok: biblioteca que reduz código repetitivo, gerando automaticamente getters, setters, construtores e outros métodos através de anotações.
+
+- Spring Web: dependência responsável por criar aplicações web e APIs REST, fornecendo recursos como @RestController, @RequestMapping e servidor embutido.
+
+- PostgreSQL Driver: driver de conexão que permite que a aplicação se comunique com o banco de dados PostgreSQL.
+
+- Spring Data JPA: módulo que facilita o acesso ao banco de dados utilizando JPA e Hibernate, permitindo criar repositórios com menos código.
+
+- Validation: fornece suporte à validação de dados usando anotações como @NotNull, @NotBlank e @Email.
+
+## Estrutura de pastas
+
+Em um projeto back-end, precisamos ter uma estrutura de projeto definida, com o objetivo
+de deixar o projeto escalável, fácil de manter e de entender, onde cada camada teria uma única função, separando assim
+as responsabilidades.
+
+nessa capacitação iremos usar a estrutura de pastas em camadas
+
+```
+com.example.spring_crud/
+├── controller/       ← Endpoints REST da aplicação (camada HTTP)
+├── dto/              ← Objetos de transferência de dados (entrada e saída da API)
+├── entity/           ← Entidades JPA que representam as tabelas do banco
+├── exception/        ← Exceções personalizadas de regra de negócio
+├── handler/          ← Tratamento global de exceções (@ControllerAdvice)
+├── mapper/           ← Conversão entre Entity e DTO (camada de mapeamento)
+├── repository/       ← Interfaces de acesso a dados (Spring Data JPA)
+├── service/          ← Regras de negócio e orquestração da aplicação
+└── SpringCrudApplication.java  ← Classe principal (ponto de entrada do Spring Boot)
+```
+
+
+
+## Passo 1: Configurar o banco de dados (Postgres)
+
+Vá para o arquivo application.properties na pasta resources e cole isso:
+
+```
+# Informações do banco de dados
+spring.datasource.url=jdbc:postgresql://localhost:5432/db_name
+spring.datasource.username:postgres
+spring.datasource.password:password
+
+# Driver JDBC
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+# JPA / Hibernate
+spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.hibernate.ddl-auto=update
+
+# Logs SQL
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+```
+
+assim, o banco de dados estará conectado com o seu back-end, basta passar a url,o nome do banco,
+o nome do usuário e a senha que você criou no seu postgres ou seja, no lugar de db_name você coloca o nome do banco, no lugar de postgres você coloca o seu usuário 
+e no lugar de password você coloca sua senha.
+
+
+## Passo 2: Criação da entity
+
+Na pasta entity você irá criar as entidades que irão representar as tabelas no banco
+de dados, ela irá conter anotações jpa como @id @entity e etc, contudo ela não deve ser
+retornada diretamente na api, pois nem sempre você vai querer mostrar todos os dados da entidade 
+para o usuário, por isso utilizamos o DTO.
+
+```java
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
+
+@Entity
+@Table(name = "tb_people")
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
+public class Person {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id", nullable = false, unique = true)
+    @Setter(AccessLevel.NONE)
+    private long id;
+
+    @Column(name = "name", nullable = false)
+    private String name;
+
+    @Column(name = "cpf", nullable = false, unique = true)
+    private String cpf;
+
+    @Column(name = "age", nullable = false)
+    private Integer age;
+
+}
+``` 
+
+as tags getter,setter, allArgsConstructor e noArgsConstructor são do lombok,
+elas nos permitem escrever menos código e facilitar o retrabalho, caso alguma propriedade
+da entidade mude, elas já geram automaticamente getters, setters e os construtores
+
+
+## Passo 2: Criação dos dtos (data-transfer-objects)
+
+O dto define o contrato da api e protege a entidade de exposição direta, faremos dtos de requisição e de resposta,
+exibindo apenas o necessário.É nessa camada que faremos a validação dos campos utilizando as tags da dependência validation
+Nos dtos, utilizaremos record ao invés da classe java comum, pois o dto é apenas um objeto de transporte, que representa o contrato da api, logo ele não precisa
+de setter, lógica complexa e mutabilidade.
+
+Um record é um tipo especial de classe introduzido no Java 14 (estável no 16) que serve para representar objetos imutáveis de forma mais simples e concisa.
+assim, o java gera automaticamente um construtor,getters,equals(), hashcode(),tostring()
+
+
+DTO de requisição(nele que irá ficar as validações)
+
+```java 
+public record PersonRequestDTO(
+        @NotBlank(message = "O nome não pode ficar em branco")
+
+        String name,
+        
+        @NotBlank(message = "O CPF não pode ficar em branco")
+        @Pattern(regexp = "\\d{11}", message = "CPF deve conter 11 dígitos numéricos")
+        String cpf,
+
+        @Min(value = 0,message = "A idade não pode ser menor que 0")
+        Integer age
+) {
+}
+```
+
+DTO de resposta
+
+
+```java
+public record PersonResponseDTO(
+        Long id,
+        String name,
+        String cpf,
+        Integer age
+) {
+}
+```
+
+## Passo 3: Criação do mapper
+
+Converte Entity ↔ DTO
+Evita código repetido no  service
+
+Utilizaremos o mapper no service, lá ficará as regras de negócios, o controller
+lidará apenas com as requisições http
+
+Nesse passo utilizaremos a biblioteca mapStruct, para isso vamos precisar adicionar 
+as seguintes dependências no pom.xml
+
+essa nos colocaremos dentro da parte dependencies
+```
+<dependency>
+			<groupId>org.mapstruct</groupId>
+			<artifactId>mapstruct</artifactId>
+			<version>1.5.5.Final</version>
+</dependency>
+```
+
+e essa dentro de annotationProcessorpath
+
+```
+	<path>
+		<groupId>org.mapstruct</groupId>
+		<artifactId>mapstruct-processor</artifactId>
+		<version>1.5.5.Final</version>
+	</path>
+```
+
+após isso, vamos na pasta mapper criar o personmapper
+
+```java
+@Mapper(componentModel = "spring")
+public interface PersonMapper {
+
+    Person toEntity(PersonRequestDTO personRequestDTO);
+
+    PersonRequestDTO toRequestDTO(Person person);
+
+    PersonResponseDTO toResponseDTO(Person person);
+
+    List<PersonResponseDTO> toListResponseDTO(List<Person> personList);
+}
+
+```
+
+Perceba que é apenas uma interface, pois precisamos apenas definir os métodos,
+o mapstruct faz a implementação automática do método
+
+
+## Passo 4: Exceções personalizadas
+
+Devemos criar exceções personalizadas, de acordo com as regras de negócio,
+como por exemplo, quando uma pessoa não é encontrado e quando já existe uma pessoa 
+com um cpf cadastrado, já que cpf é unico.
+
+O objetivo disso é tornar os erros mais claros, tanto para o usuário, quanto para o desenvolvedor.
+
+```java
+
+
+public class CpfJaCadastradoException extends RuntimeException {
+    public CpfJaCadastradoException(String message) {
+        super(message);
+    }
+
+   public CpfJaCadastradoException(){
+        super("Cpf já cadastrado");
+   }
+}
+
+
+```
+
+
+```java
+public class PersonNotFoundException extends RuntimeException {
+    public PersonNotFoundException(String message) {
+        super(message);
+    }
+
+    public PersonNotFoundException(){
+      super("Pessoa não encontrada");
+    }
+}
+```
+
+
+## Passo 5: Criação do Repository
+
+Aqui é a camada que irá se comunicar com o banco de dados,
+nela utilizaremos o jpaRepository, onde já vem métodos nativos,assim,não precisando escrever sql diretamente.
+
+Também podemos criar métodos personalizados, para métodos mais simples, basta colocar o nome 
+do método, já para métodos mais complexos, poderemos utilizar jpqa.
+
+
+```java
+public interface PersonRepository extends JpaRepository<Person,Long> {
+
+    boolean existsByCpf(String cpf);
+
+
+
+    @Query("""
+            SELECT p FROM Person p
+            WHERE p.cpf = :cpf
+            """)
+    Optional<Person> findByCpf(@Param("cpf") String cpf);
+}
+
+```
+
+Perceba que criamos uma interface e extendemos o jparepository, Onde o primeiro parametro é a entidade e o segundo é o tipo do id.
+
+
+## Passo 6: Criação do Service
+
+Aqui é onde ficará as regras de negócios e a lógica da aplicação, também é aqui que iremos chamar o mapper e o repository
+
+Para indicar que é um service, precisamos colocar a tag @Service na classe, perceba que 
+estamos utilizando autowired, isso é uma tag do lombok, que já faz automaticamente a injeção de dependências,
+assim não precisamos fazer a injeção via construtor, assim escrevendo menos código.
+
+Cada método aqui representa uma operação do crud(CREATE-READ-UPDATE-DELETE)
+
+Perceba que estamos usando as exceções personalizadas, pois elas foram criadas de acordo
+com as regras de negócio.
+
+```java
+
+@Service
+public class PersonService {
+
+    @Autowired
+    private PersonMapper personMapper;
+
+    @Autowired
+    private PersonRepository personRepository;
+
+
+    public PersonResponseDTO createPerson(PersonRequestDTO personRequestDTO){
+        Person person=this.personMapper.toEntity(personRequestDTO);
+        if(this.personRepository.existsByCpf(person.getCpf())){
+            throw  new CpfJaCadastradoException();
+        }
+        Person savedPerson=this.personRepository.save(person);
+        return  this.personMapper.toResponseDTO(savedPerson);
+    }
+
+
+    public Person getPerson(Long id){
+        return this.personRepository.findById(id).orElseThrow(()->new PersonNotFoundException());
+    }
+
+    public PersonResponseDTO getPersonById(Long id){
+        Person person=this.getPerson(id);
+        return this.personMapper.toResponseDTO(person);
+    }
+
+    public PersonResponseDTO getPersonByCPF(String cpf){
+        Person person=this.personRepository.findByCpf(cpf).orElseThrow(()-> new PersonNotFoundException());
+        return this.personMapper.toResponseDTO(person);
+    }
+
+    public void deletePersonById(Long id){
+        Person person=this.getPerson(id);
+        this.personRepository.delete(person);
+    }
+
+    public List<PersonResponseDTO> getAllPersons(){
+        return this.personMapper.toListResponseDTO(this.personRepository.findAll());
+    }
+
+    public PersonResponseDTO updatePerson(Long id,PersonRequestDTO personRequestDTO){
+        Person person=this.getPerson(id);
+        person.setAge(personRequestDTO.age());
+        person.setCpf(personRequestDTO.cpf());
+        person.setName(personRequestDTO.name());
+
+        Person save=this.personRepository.save(person);
+        return this.personMapper.toResponseDTO(save);
+    }
+}
+
+```
+
+## Passo 7: Documentação com swagger
+
+A documentação é uma das etapas mais importantes no desenvolvimento de uma API.
+Ela permite que desenvolvedores entendam claramente:
+
+- Quais endpoints existem
+
+- Quais métodos HTTP são utilizados
+
+- Quais dados devem ser enviados
+
+- Quais respostas podem ser retornadas
+
+- Quais possíveis erros podem ocorrer
+
+Sem documentação, uma API se torna difícil de usar, manter e evoluir.
+
+O Swagger é uma ferramenta baseada no padrão OpenAPI que permite gerar automaticamente a documentação interativa da API a partir do próprio código.
+
+No ecossistema do Spring Boot, normalmente utilizamos o Springdoc OpenAPI, que integra o Swagger de forma simples.
+
+Ele gera uma interface web onde é possível:
+
+- Visualizar todos os endpoints
+
+- Testar requisições diretamente pelo navegador
+
+- Ver modelos de requisição e resposta
+
+- Ver códigos de status HTTP possíveis
+
+Para adicionar o swagger na sua api, basta adicionar essa dependência no seu pom.xml
+
+```
+	<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>2.8.12</version>
+		</dependency>
+```
+
+Utilizaremos as tags do swagger no controller para documentar os endpoints,elas também
+podem ser utilizadas no dto.
+
+para acessar o swagger, vá para o link:
+
+```
+http://localhost:8080/swagger-ui/index.html
+```
+
+
+
+## Passo 8: Controller
+
+O controller é responsável pela criação das rotas e ele lida com as requisições http,
+as regras de negócio devem ficar no service e não no controller, nele também documentamos o endpoint com o swagger
+
+exemplo:
+
+
+```java
+
+@RestController
+@RequestMapping("/pessoas")
+@Tag(name="Pessoas")
+public class PersonController {
+
+
+    @Autowired
+    private PersonService personService;
+
+
+    @PostMapping
+    @Operation(summary = "Cria uma nova pessoa com as informações fornecidas")
+    public ResponseEntity<PersonResponseDTO> createPerson(@RequestBody @Valid PersonRequestDTO personRequestDTO){
+        PersonResponseDTO person=this.personService.createPerson(personRequestDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body(person);
+    }
+
+
+    @GetMapping
+    @Operation(summary = "lista todas as pessoas")
+    public ResponseEntity<List<PersonResponseDTO>> getAllPersons(){
+        return ResponseEntity.ok(this.personService.getAllPersons());
+    }
+
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Busca uma pessoa por id")
+    public ResponseEntity<PersonResponseDTO> getPersonById(     @Parameter(description = "ID da pessoa") @PathVariable Long id){
+        PersonResponseDTO personResponseDTO=this.personService.getPersonById(id);
+        return ResponseEntity.ok(personResponseDTO);
+    }
+
+
+    @GetMapping("/cpf/{cpf}")
+    @Operation(summary = "Busca uma pessoa por cpf")
+    public ResponseEntity<PersonResponseDTO> getPersonByCPF(     @Parameter(description = "CPF da pessoa") @PathVariable String cpf){
+        PersonResponseDTO personResponseDTO=this.personService.getPersonByCPF(cpf);
+        return ResponseEntity.ok(personResponseDTO);
+    }
+
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Exclui uma pessoa pelo ID")
+    public ResponseEntity<Void> deletePerson(
+            @Parameter(description = "ID da pessoa") @PathVariable Long id
+    ){
+        this.personService.deletePersonById(id);
+        return ResponseEntity.noContent().build();
+    }
+}
+
+```
+
+
+Perceba que há várias tags nele, vamos entender cada uma:
+
+🏷️ @RestController
+
+Indica que a classe é um controller REST.
+
+Ele:
+
+- Combina @Controller + @ResponseBody
+
+- Retorna dados em JSON automaticamente
+
+- Indica que os métodos respondem requisições HTTP
+
+🗺️ @RequestMapping("/pessoas")
+
+Define a rota base do controller.
+
+Isso significa que:
+
+- Todos os endpoints começarão com /pessoas
+
+- Organiza as rotas relacionadas à entidade Pessoa
+
+- Evita repetição de caminho em cada método
+
+
+📌 @Tag(name="Pessoas")
+
+Anotação do Swagger (OpenAPI).
+
+Ela:
+
+- Agrupa os endpoints na documentação
+
+- Organiza visualmente as rotas por categoria
+
+- Facilita a navegação na interface do Swagger
+
+Na interface, aparecerá uma seção chamada "Pessoas" contendo todos os endpoints desse controller.
+
+📝 @Operation(summary = "...")
+
+Também é uma anotação do Swagger.
+
+Ela:
+
+- Define uma descrição resumida do endpoint
+
+- Explica o que aquele método faz
+
+- Melhora a clareza da documentação
+
+
+📥 @RequestBody
+
+Indica que os dados vêm do corpo da requisição (JSON).
+
+Ela:
+
+- Converte automaticamente JSON em objeto Java
+
+- Permite enviar dados complexos
+
+- É usada geralmente em POST e PUT
+
+
+✅ @Valid
+
+Ativa a validação do DTO.
+
+Ela:
+
+- Executa as validações definidas no DTO (@NotNull, @NotBlank, etc.)
+
+- Garante integridade dos dados
+
+- Lança exceção automaticamente se os dados forem inválidos
+
+
+
+🔢 @PathVariable
+
+Captura valores diretamente da URL.
+
+Ela:
+
+- Permite receber parâmetros da rota
+
+- Mapeia {id} ou {cpf} para variáveis do método
+
+
+
+📘 @Parameter(description = "...")
+
+Anotação do Swagger.
+
+Ela:
+
+- Adiciona descrição ao parâmetro na documentação
+
+- Torna mais claro o que aquele parâmetro representa
+
+- Melhora a experiência de quem consome a API
+
+
+📤 ResponseEntity
+
+Permite controlar completamente a resposta HTTP.
+
+Ela possibilita:
+
+- Definir código de status (200, 201, 204, etc.)
+
+- Retornar corpo da resposta
+
+- Configurar headers se necessário
+
+
+
+## Passo 9: Tratamento de exceções
+
+Vamos criar um handler de exceções na pasta handler, com o objetivo de padronizar
+o formato de resposta das exceções, para que elas fiquem mais claras e melhores de visualizar.
+Para isso vamo criar dois dtos
+
+
+DTO para obter os campos inválidos
+
+```java
+public record FieldError(String field,String message) {
+}
+
+```
+
+
+Dto de resposta(Perceba que estamos utilizando tags do swagger para documentar o dto)
+```java
+@Schema(
+        description = "DTO that encapsulates detailed information about errors or exceptions."
+)
+@JsonPropertyOrder(alphabetic = true)
+public record ExceptionResponseDTO(
+
+
+
+        @Schema(description = "List of field errors detailing the specific issues with the request.")
+        List<FieldError> errors,
+
+        @Schema(description = "HTTP status code associated with the error.", example = "400")
+        String status,
+
+        @Schema(description = "A detailed description of the error or exception that occurred.", example = "Missing or invalid required fields.")
+        String message
+
+) {
+}
+```
+
+Após isso, vamos criar um globalexception handler na pasta handler e tratar as exceções nele:
+Nele usaremos as tags RestControllerAdvice e ExceptionHandler, assim o spring irá entender que ele irá lidar com as exceções
+
+```java
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ExceptionResponseDTO> threatGeneralExceptions(Exception exception){
+        ExceptionResponseDTO exceptionDTO=new ExceptionResponseDTO(null, HttpStatus.BAD_REQUEST.toString(), exception.getMessage());
+        return ResponseEntity.internalServerError().body(exceptionDTO);
+    }
+
+
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ExceptionResponseDTO> handleValidationExceptions(MethodArgumentNotValidException ex) {
+
+        List<FieldError> errors=new ArrayList<>();
+
+        ex.getBindingResult().getFieldErrors().forEach(error->{
+            FieldError fieldError=new FieldError(error.getField(),error.getDefaultMessage());
+            errors.add(fieldError);
+        });
+
+        ExceptionResponseDTO response = new ExceptionResponseDTO(errors, HttpStatus.BAD_REQUEST.toString(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(PersonNotFoundException.class)
+    public ResponseEntity<ExceptionResponseDTO> threatSystemNotFound(PersonNotFoundException exception){
+        ExceptionResponseDTO exceptionDTO=new ExceptionResponseDTO(
+                null,
+                HttpStatus.NOT_FOUND.toString(),
+                exception.getMessage()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(exceptionDTO);
+
+    }
+
+    @ExceptionHandler(CpfJaCadastradoException.class)
+    public ResponseEntity<ExceptionResponseDTO> threatSystemNotFound(CpfJaCadastradoException exception){
+        ExceptionResponseDTO exceptionDTO=new ExceptionResponseDTO(
+                null,
+                HttpStatus.CONFLICT.toString(),
+                exception.getMessage()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(exceptionDTO);
+
+    }
+}
+
+
+```
