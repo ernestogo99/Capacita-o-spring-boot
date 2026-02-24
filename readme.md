@@ -683,3 +683,27 @@ public class GlobalExceptionHandler {
 
 
 ```
+
+
+## Boas práticas
+
+- Criar Exceções personalizadas
+- Tratar Exceções
+- Escolher uma boa estrutura de projeto
+- Métodos com nomes claros
+- Respeitar o princípio único de responsabilidade(cada camada tem sua função)
+- Documentar a api
+- Manter Métodos pequenos e com responsabilidade única
+
+
+## Resumo
+
+Finalizando a capacitação, vemos que o fluxo que seguimos foi
+
+entity -> dto -> mapper -> repository -> service -> controller
+
+
+além das exceções personalizadas e do tratamento de exceções
+Perceba que cada camada tem sua responsabilidade e que ela se conecta
+com as outras camadas, isso deve ser respeitado para garantir que a api 
+esteja escalável e fácil de manter.
