@@ -2,6 +2,29 @@
 
 O objetivo dessa capacitação é ensinar como criar uma api em spring boot utilizando boas práticas
 
+![Swagger](https://img.shields.io/badge/Swagger-%2383B93E?style=for-the-badge&logo=swagger&logoColor=white)
+![Postgres](https://img.shields.io/badge/postgres-%234D6A9C.svg?style=for-the-badge&logo=postgresql&logoColor=white)
+![Java](https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
+![Spring](https://img.shields.io/badge/SpringBoot-6DB33F?style=flat-square&logo=Spring&logoColor=white)
+## Tabela de conteúdos
+
+- [O que é o Spring Boot?](#o-que-é-o-spring-boot)
+- [Como criar um projeto em Java com Spring Boot](#como-criar-um-projeto-em-java-com-spring-boot)
+- [Estrutura de Pastas](#estrutura-de-pastas)
+- [Passo 1: Configurar o banco de dados (Postgres)](#passo-1-configurar-o-banco-de-dados-postgres)
+- [Passo 2: Criação da Entity](#passo-2-criação-da-entity)
+- [Passo 3: Criação dos DTOs](#passo-2-criação-dos-dtos)
+- [Passo 4: Criação do Mapper](#passo-3-criação-do-mapper)
+- [Passo 5: Exceções Personalizadas](#passo-4-exceções-personalizadas)
+- [Passo 6: Criação do Repository](#passo-5-criação-do-repository)
+- [Passo 7: Criação do Service](#passo-6-criação-do-service)
+- [Passo 8: Documentação com Swagger](#passo-7-documentação-com-swagger)
+- [Passo 9: Controller](#passo-8-controller)
+- [Passo 10: Tratamento de Exceções](#passo-9-tratamento-de-exceções)
+- [Boas Práticas](#boas-práticas)
+- [Resumo](#resumo)
+
+
 ## O que é o spring Boot?
 Spring Boot é um framework que facilita a criação de aplicações Java baseadas no Spring, principalmente APIs e aplicações web, com o mínimo de configuração manual.
 
@@ -122,7 +145,7 @@ elas nos permitem escrever menos código e facilitar o retrabalho, caso alguma p
 da entidade mude, elas já geram automaticamente getters, setters e os construtores
 
 
-## Passo 2: Criação dos dtos (data-transfer-objects)
+## Passo 3: Criação dos dtos (data-transfer-objects)
 
 O dto define o contrato da api e protege a entidade de exposição direta, faremos dtos de requisição e de resposta,
 exibindo apenas o necessário.É nessa camada que faremos a validação dos campos utilizando as tags da dependência validation
@@ -164,7 +187,7 @@ public record PersonResponseDTO(
 }
 ```
 
-## Passo 3: Criação do mapper
+## Passo 4: Criação do mapper
 
 Converte Entity ↔ DTO
 Evita código repetido no  service
@@ -215,7 +238,7 @@ Perceba que é apenas uma interface, pois precisamos apenas definir os métodos,
 o mapstruct faz a implementação automática do método
 
 
-## Passo 4: Exceções personalizadas
+## Passo 5: Exceções personalizadas
 
 Devemos criar exceções personalizadas, de acordo com as regras de negócio,
 como por exemplo, quando uma pessoa não é encontrado e quando já existe uma pessoa 
@@ -253,7 +276,7 @@ public class PersonNotFoundException extends RuntimeException {
 ```
 
 
-## Passo 5: Criação do Repository
+## Passo 6: Criação do Repository
 
 Aqui é a camada que irá se comunicar com o banco de dados,
 nela utilizaremos o jpaRepository, onde já vem métodos nativos,assim,não precisando escrever sql diretamente.
@@ -281,7 +304,7 @@ public interface PersonRepository extends JpaRepository<Person,Long> {
 Perceba que criamos uma interface e extendemos o jparepository, Onde o primeiro parametro é a entidade e o segundo é o tipo do id.
 
 
-## Passo 6: Criação do Service
+## Passo 7: Criação do Service
 
 Aqui é onde ficará as regras de negócios e a lógica da aplicação, também é aqui que iremos chamar o mapper e o repository
 
@@ -352,7 +375,7 @@ public class PersonService {
 
 ```
 
-## Passo 7: Documentação com swagger
+## Passo 8: Documentação com swagger
 
 A documentação é uma das etapas mais importantes no desenvolvimento de uma API.
 Ela permite que desenvolvedores entendam claramente:
@@ -404,7 +427,7 @@ http://localhost:8080/swagger-ui/index.html
 
 
 
-## Passo 8: Controller
+## Passo 9: Controller
 
 O controller é responsável pela criação das rotas e ele lida com as requisições http,
 as regras de negócio devem ficar no service e não no controller, nele também documentamos o endpoint com o swagger
@@ -588,7 +611,7 @@ Ela possibilita:
 
 
 
-## Passo 9: Tratamento de exceções
+## Passo 10: Tratamento de exceções
 
 Vamos criar um handler de exceções na pasta handler, com o objetivo de padronizar
 o formato de resposta das exceções, para que elas fiquem mais claras e melhores de visualizar.
