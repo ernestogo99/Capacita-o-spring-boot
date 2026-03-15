@@ -65,4 +65,11 @@ public class PersonController {
         this.personService.deletePersonById(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Atualiza uma pessoa utilizando o ID")
+    public ResponseEntity<PersonResponseDTO> updatePersonById(  @Parameter(description = "ID da pessoa") @PathVariable Long id, @RequestBody @Valid PersonRequestDTO personRequestDTO){
+        PersonResponseDTO response=this.personService.updatePerson(id,personRequestDTO);
+        return ResponseEntity.ok(response);
+    }
 }
