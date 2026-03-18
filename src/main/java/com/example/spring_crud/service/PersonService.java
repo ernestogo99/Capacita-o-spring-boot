@@ -15,11 +15,16 @@ import java.util.List;
 @Service
 public class PersonService {
 
-    @Autowired
-    private PersonMapper personMapper;
 
-    @Autowired
-    private PersonRepository personRepository;
+    private final PersonMapper personMapper;
+
+
+    private final PersonRepository personRepository;
+
+    public PersonService(PersonMapper personMapper,PersonRepository personRepository){
+        this.personMapper=personMapper;
+        this.personRepository=personRepository;
+    }
 
 
     public PersonResponseDTO createPerson(PersonRequestDTO personRequestDTO){

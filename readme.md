@@ -309,8 +309,8 @@ Perceba que criamos uma interface e extendemos o jparepository, Onde o primeiro 
 Aqui é onde ficará as regras de negócios e a lógica da aplicação, também é aqui que iremos chamar o mapper e o repository
 
 Para indicar que é um service, precisamos colocar a tag @Service na classe, perceba que 
-estamos utilizando autowired, isso é uma tag do lombok, que já faz automaticamente a injeção de dependências,
-assim não precisamos fazer a injeção via construtor, assim escrevendo menos código.
+estamos utilizando  injeção via construtor ao invés de @autowired do lombok, pois a injeção via construtor facilita
+testes, garante imutabilidade(Final) e segue as boas práticas do spring moderno.
 
 Cada método aqui representa uma operação do crud(CREATE-READ-UPDATE-DELETE)
 
@@ -322,12 +322,15 @@ com as regras de negócio.
 @Service
 public class PersonService {
 
-    @Autowired
-    private PersonMapper personMapper;
+    private final PersonMapper personMapper;
 
-    @Autowired
-    private PersonRepository personRepository;
 
+    private final PersonRepository personRepository;
+
+    public PersonService(PersonMapper personMapper,PersonRepository personRepository){
+        this.personMapper=personMapper;
+        this.personRepository=personRepository;
+    }
 
     public PersonResponseDTO createPerson(PersonRequestDTO personRequestDTO){
         Person person=this.personMapper.toEntity(personRequestDTO);
@@ -443,8 +446,11 @@ exemplo:
 public class PersonController {
 
 
-    @Autowired
-    private PersonService personService;
+    private final PersonService personService;
+
+    public PersonController(PersonService personService){
+        this.personService=personService;
+    }
 
 
     @PostMapping
