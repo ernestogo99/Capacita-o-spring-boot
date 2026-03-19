@@ -20,7 +20,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ExceptionResponseDTO> threatGeneralExceptions(Exception exception){
-        ExceptionResponseDTO exceptionDTO=new ExceptionResponseDTO(null, HttpStatus.BAD_REQUEST.toString(), exception.getMessage());
+        ExceptionResponseDTO exceptionDTO=new ExceptionResponseDTO(null, HttpStatus.INTERNAL_SERVER_ERROR.toString(), exception.getMessage());
         return ResponseEntity.internalServerError().body(exceptionDTO);
     }
 

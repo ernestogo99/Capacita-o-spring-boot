@@ -19,9 +19,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/pessoas")
 @Tag(name="Pessoas")
-public class PersonController {
-
-
+public class PersonController implements PersonControllerDocs {
 
     private final PersonService personService;
 
@@ -31,7 +29,7 @@ public class PersonController {
 
 
     @PostMapping
-    @Operation(summary = "Cria uma nova pessoa com as informações fornecidas")
+    @Override
     public ResponseEntity<PersonResponseDTO> createPerson(@RequestBody @Valid PersonRequestDTO personRequestDTO){
         PersonResponseDTO person=this.personService.createPerson(personRequestDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(person);
@@ -39,14 +37,14 @@ public class PersonController {
 
 
     @GetMapping
-    @Operation(summary = "lista todas as pessoas")
+    @Override
     public ResponseEntity<List<PersonResponseDTO>> getAllPersons(){
         return ResponseEntity.ok(this.personService.getAllPersons());
     }
 
 
     @GetMapping("/{id}")
-    @Operation(summary = "Busca uma pessoa por id")
+    @Override
     public ResponseEntity<PersonResponseDTO> getPersonById(     @Parameter(description = "ID da pessoa") @PathVariable Long id){
         PersonResponseDTO personResponseDTO=this.personService.getPersonById(id);
         return ResponseEntity.ok(personResponseDTO);
@@ -54,7 +52,7 @@ public class PersonController {
 
 
     @GetMapping("/cpf/{cpf}")
-    @Operation(summary = "Busca uma pessoa por cpf")
+    @Override
     public ResponseEntity<PersonResponseDTO> getPersonByCPF(     @Parameter(description = "CPF da pessoa") @PathVariable String cpf){
         PersonResponseDTO personResponseDTO=this.personService.getPersonByCPF(cpf);
         return ResponseEntity.ok(personResponseDTO);
@@ -62,7 +60,7 @@ public class PersonController {
 
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Exclui uma pessoa pelo ID")
+    @Override
     public ResponseEntity<Void> deletePerson(
             @Parameter(description = "ID da pessoa") @PathVariable Long id
     ){
@@ -71,7 +69,7 @@ public class PersonController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Atualiza uma pessoa utilizando o ID")
+    @Override
     public ResponseEntity<PersonResponseDTO> updatePersonById(  @Parameter(description = "ID da pessoa") @PathVariable Long id, @RequestBody @Valid PersonRequestDTO personRequestDTO){
         PersonResponseDTO response=this.personService.updatePerson(id,personRequestDTO);
         return ResponseEntity.ok(response);

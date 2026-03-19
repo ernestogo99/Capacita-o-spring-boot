@@ -433,9 +433,162 @@ http://localhost:8080/swagger-ui/index.html
 ## Passo 9: Controller
 
 O controller é responsável pela criação das rotas e ele lida com as requisições http,
-as regras de negócio devem ficar no service e não no controller, nele também documentamos o endpoint com o swagger
+as regras de negócio devem ficar no service e não no controller, nele também documentamos o endpoint com o swagger,
+mas como a documentação com o swagger pega muito espaço do código, vamos separar ela em uma interface,assim deixando o controller mais limpo
+
 
 exemplo:
+
+```java
+
+public interface PersonControllerDocs {
+    @Operation(
+            summary = "Criar pessoa",
+            description = """
+                    Cria uma nova pessoa no sistema.
+                    
+                    ### Campos obrigatórios:
+                    - Nome
+                    - CPF (único)
+                    - Idade
+                    
+                    ### Regras:
+                    - CPF deve ser único
+                    - CPF deve conter 11 dígitos numéricos
+                    """
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "201",
+                    description = "Pessoa criada com sucesso",
+                    content = @Content(schema = @Schema(implementation = PersonResponseDTO.class))
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Dados inválidos",
+                    content = @Content(schema = @Schema(implementation = ExceptionResponseDTO.class))
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "CPF já cadastrado",
+                    content = @Content(schema = @Schema(implementation = ExceptionResponseDTO.class))
+            )
+    })
+    ResponseEntity<PersonResponseDTO> createPerson(PersonRequestDTO personRequestDTO);
+
+
+    @Operation(
+            summary = "Listar pessoas",
+            description = "Retorna todas as pessoas cadastradas no sistema."
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "Lista retornada com sucesso"
+    )
+    ResponseEntity<List<PersonResponseDTO>> getAllPersons();
+
+
+    @Operation(
+            summary = "Buscar pessoa por ID",
+            description = "Retorna uma pessoa com base no ID informado."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Pessoa encontrada",
+                    content = @Content(schema = @Schema(implementation = PersonResponseDTO.class))
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Pessoa não encontrada",
+                    content = @Content(schema = @Schema(implementation = ExceptionResponseDTO.class))
+            )
+    })
+    ResponseEntity<PersonResponseDTO> getPersonById(
+            @Parameter(description = "ID da pessoa", required = true)
+            Long id
+    );
+
+
+    @Operation(
+            summary = "Buscar pessoa por CPF",
+            description = "Retorna uma pessoa com base no CPF informado."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Pessoa encontrada",
+                    content = @Content(schema = @Schema(implementation = PersonResponseDTO.class))
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Pessoa não encontrada",
+                    content = @Content(schema = @Schema(implementation = ExceptionResponseDTO.class))
+            )
+    })
+    ResponseEntity<PersonResponseDTO> getPersonByCPF(
+            @Parameter(description = "CPF da pessoa (apenas números)", required = true)
+            String cpf
+    );
+
+
+    @Operation(
+            summary = "Atualizar pessoa",
+            description = """
+                    Atualiza os dados de uma pessoa existente.
+                    
+                    ### Regras:
+                    - A pessoa deve existir
+                    - CPF deve continuar único
+                    """
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Pessoa atualizada com sucesso",
+                    content = @Content(schema = @Schema(implementation = PersonResponseDTO.class))
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Pessoa não encontrada",
+                    content = @Content(schema = @Schema(implementation = ExceptionResponseDTO.class))
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "CPF já cadastrado",
+                    content = @Content(schema = @Schema(implementation = ExceptionResponseDTO.class))
+            )
+    })
+    ResponseEntity<PersonResponseDTO> updatePersonById(
+            @Parameter(description = "ID da pessoa", required = true)
+            Long id,
+            PersonRequestDTO personRequestDTO
+    );
+
+
+    @Operation(
+            summary = "Excluir pessoa",
+            description = "Remove uma pessoa do sistema a partir do ID."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "204",
+                    description = "Pessoa removida com sucesso"
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Pessoa não encontrada",
+                    content = @Content(schema = @Schema(implementation = ExceptionResponseDTO.class))
+            )
+    })
+    ResponseEntity<Void> deletePerson(
+            @Parameter(description = "ID da pessoa", required = true)
+            Long id
+    );
+}
+
+```
+
 
 
 ```java
@@ -443,7 +596,8 @@ exemplo:
 @RestController
 @RequestMapping("/pessoas")
 @Tag(name="Pessoas")
-public class PersonController {
+public class PersonController implements PersonControllerDocs {
+
 
 
     private final PersonService personService;
@@ -454,7 +608,7 @@ public class PersonController {
 
 
     @PostMapping
-    @Operation(summary = "Cria uma nova pessoa com as informações fornecidas")
+    @Override
     public ResponseEntity<PersonResponseDTO> createPerson(@RequestBody @Valid PersonRequestDTO personRequestDTO){
         PersonResponseDTO person=this.personService.createPerson(personRequestDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(person);
@@ -462,14 +616,14 @@ public class PersonController {
 
 
     @GetMapping
-    @Operation(summary = "lista todas as pessoas")
+    @Override
     public ResponseEntity<List<PersonResponseDTO>> getAllPersons(){
         return ResponseEntity.ok(this.personService.getAllPersons());
     }
 
 
     @GetMapping("/{id}")
-    @Operation(summary = "Busca uma pessoa por id")
+    @Override
     public ResponseEntity<PersonResponseDTO> getPersonById(     @Parameter(description = "ID da pessoa") @PathVariable Long id){
         PersonResponseDTO personResponseDTO=this.personService.getPersonById(id);
         return ResponseEntity.ok(personResponseDTO);
@@ -477,7 +631,7 @@ public class PersonController {
 
 
     @GetMapping("/cpf/{cpf}")
-    @Operation(summary = "Busca uma pessoa por cpf")
+    @Override
     public ResponseEntity<PersonResponseDTO> getPersonByCPF(     @Parameter(description = "CPF da pessoa") @PathVariable String cpf){
         PersonResponseDTO personResponseDTO=this.personService.getPersonByCPF(cpf);
         return ResponseEntity.ok(personResponseDTO);
@@ -485,12 +639,19 @@ public class PersonController {
 
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Exclui uma pessoa pelo ID")
+    @Override
     public ResponseEntity<Void> deletePerson(
             @Parameter(description = "ID da pessoa") @PathVariable Long id
     ){
         this.personService.deletePersonById(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{id}")
+    @Override
+    public ResponseEntity<PersonResponseDTO> updatePersonById(  @Parameter(description = "ID da pessoa") @PathVariable Long id, @RequestBody @Valid PersonRequestDTO personRequestDTO){
+        PersonResponseDTO response=this.personService.updatePerson(id,personRequestDTO);
+        return ResponseEntity.ok(response);
     }
 }
 
