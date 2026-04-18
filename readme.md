@@ -6,7 +6,7 @@ O objetivo dessa capacitação é ensinar como criar uma api em spring boot util
 ![Postgres](https://img.shields.io/badge/postgres-%234D6A9C.svg?style=for-the-badge&logo=postgresql&logoColor=white)
 ![Java](https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
 ![Spring](https://img.shields.io/badge/SpringBoot-6DB33F?style=flat-square&logo=Spring&logoColor=white)
-## Tabela de conteúdos
+## Seção 1 (Crud básico)
 
 - [O que é o Spring Boot?](#o-que-é-o-spring-boot)
 - [Como criar um projeto em Java com Spring Boot](#como-criar-um-projeto-em-java-com-spring-boot)
@@ -888,7 +888,7 @@ public class GlobalExceptionHandler {
 
 ## Resumo
 
-Finalizando a capacitação, vemos que o fluxo que seguimos foi
+Finalizando a seção 1, vemos que o fluxo que seguimos foi
 
 entity -> dto -> mapper -> repository -> service -> controller
 
@@ -897,3 +897,5 @@ além das exceções personalizadas e do tratamento de exceções
 Perceba que cada camada tem sua responsabilidade e que ela se conecta
 com as outras camadas, isso deve ser respeitado para garantir que a api 
 esteja escalável e fácil de manter.
+
+
