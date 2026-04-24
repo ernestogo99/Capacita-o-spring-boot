@@ -899,3 +899,157 @@ com as outras camadas, isso deve ser respeitado para garantir que a api
 esteja escalável e fácil de manter.
 
 
+# Seção 2 (Paginação,Ordenação,Filtros e Busca avançada)
+
+- [Paginação](#paginação)
+- [Ordenação](#ordenação)
+- [Filtros](#filtros)
+- [Busca avançada](#busca-avançada)
+
+
+# Paginação
+
+- Paginação é uma técnica usada para dividir grandes volumes de dados em partes menores (páginas),ao invés de retornar tudo de uma vez.
+
+A paginação do java possui 3 parâmetros principais:
+- page: número de páginas
+- size: quantidade de registros por página
+- sort: ordenação dos dados
+
+
+O spring resolve a paginação utilizando o seguinte:
+- Pageable: representa os parâmetros da página
+- Page<T>: representa o resultado paginado
+
+Vamos criar dtos para padronizar as respostas da api com a paginação
+
+
+```java
+public record SortFieldDTO(
+        String field,
+        String direction
+) {}
+```
+
+```java
+
+public record PaginationResponseDTO(
+        Integer page,
+        Integer pageSize,
+        Long totalElements,
+        Integer totalPages,
+        List<SortFieldDTO> sort) {
+
+    public static PaginationResponseDTO fromPage(Page<?> page){
+        List<SortFieldDTO> sortFields = page.getSort()
+                .stream()
+                .map(order -> new SortFieldDTO(
+                        order.getProperty(),
+                        order.getDirection().name()
+                ))
+                .toList();
+        return  new PaginationResponseDTO(
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),   
+                sortFields
+        );
+    }
+}
+
+```
+
+
+Perceba que esse T é um tipo genérico, ou seja, podemos deixar essa resposta como padrão, para diversos tipos
+```java
+public record ApiResponseDTO<T>(
+        List<T> data,
+        PaginationResponseDTO pagination
+) {
+}
+```
+
+Devemos também fazer um mapper
+```java
+
+public final class ApiResponseMapper {
+
+    private ApiResponseMapper(){
+
+    }
+
+    public static <E, D> ApiResponseDTO<D> fromPage(
+            Page<E> page,
+            Function<E, D> mapper
+    ) {
+        List<D> data = page.getContent()
+                .stream()
+                .map(mapper)
+                .toList();
+
+        return new ApiResponseDTO<>(
+                data,
+                PaginationResponseDTO.fromPage(page)
+        );
+    }
+}
+```
+
+
+
+Assim iremos para o service e criaremos um método que retorna uma lista de pessoas com paginação
+
+```java
+ public ApiResponseDTO<PersonResponseDTO> getAllPersonWithPagination(Pageable pageable) {
+        Page<Person> page = this.personRepository.findAll(pageable);
+
+        return ApiResponseMapper.fromPage(
+                page,
+                this.personMapper::toResponseDTO
+        );
+    }
+```
+
+
+Agora no controller:
+
+- na interface controllerdocs
+```java
+ @Operation(
+            summary = "Listar pessoas com paginação e ordenação por campos",
+            description = "Retorna todas as pessoas cadastradas no sistema."
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "Lista retornada com sucesso"
+    )
+    public ResponseEntity<ApiResponseDTO<PersonResponseDTO>> getAllPersonWithPagination(
+            @ParameterObject
+             Pageable pageable
+    );
+
+```
+
+- no controller
+```java
+  @GetMapping(
+            value = "/with-pagination",
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    @Override
+    public ResponseEntity<ApiResponseDTO<PersonResponseDTO>> getAllSystemsWithResult(
+            @PageableDefault(
+                    size = 10,
+                    sort ="age",
+                    page = 0
+            ) Pageable pageable
+    ) {
+        ApiResponseDTO<PersonResponseDTO> response =
+                this.personService.getAllPersonWithPagination(pageable);
+        return ResponseEntity.ok(response);
+    }
+```
+
+
+

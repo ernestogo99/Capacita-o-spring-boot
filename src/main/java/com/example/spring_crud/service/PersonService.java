@@ -1,13 +1,17 @@
 package com.example.spring_crud.service;
 
 import com.example.spring_crud.dto.request.PersonRequestDTO;
+import com.example.spring_crud.dto.response.ApiResponseDTO;
 import com.example.spring_crud.dto.response.PersonResponseDTO;
 import com.example.spring_crud.entity.Person;
 import com.example.spring_crud.exception.CpfJaCadastradoException;
 import com.example.spring_crud.exception.PersonNotFoundException;
+import com.example.spring_crud.mapper.ApiResponseMapper;
 import com.example.spring_crud.mapper.PersonMapper;
 import com.example.spring_crud.repository.PersonRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -68,5 +72,14 @@ public class PersonService {
 
         Person save=this.personRepository.save(person);
         return this.personMapper.toResponseDTO(save);
+    }
+
+    public ApiResponseDTO<PersonResponseDTO> getAllPersonWithPagination(Pageable pageable) {
+        Page<Person> page = this.personRepository.findAll(pageable);
+
+        return ApiResponseMapper.fromPage(
+                page,
+                this.personMapper::toResponseDTO
+        );
     }
 }

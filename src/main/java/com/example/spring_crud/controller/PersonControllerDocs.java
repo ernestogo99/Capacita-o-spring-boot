@@ -1,6 +1,7 @@
 package com.example.spring_crud.controller;
 
 import com.example.spring_crud.dto.request.PersonRequestDTO;
+import com.example.spring_crud.dto.response.ApiResponseDTO;
 import com.example.spring_crud.dto.response.ExceptionResponseDTO;
 import com.example.spring_crud.dto.response.PersonResponseDTO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -9,6 +10,9 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 
 import java.util.List;
@@ -58,6 +62,20 @@ public interface PersonControllerDocs {
             description = "Lista retornada com sucesso"
     )
     ResponseEntity<List<PersonResponseDTO>> getAllPersons();
+
+
+    @Operation(
+            summary = "Listar pessoas com paginação e ordenação por campos",
+            description = "Retorna todas as pessoas cadastradas no sistema."
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "Lista retornada com sucesso"
+    )
+    public ResponseEntity<ApiResponseDTO<PersonResponseDTO>> getAllPersonWithPagination(
+            @ParameterObject
+             Pageable pageable
+    );
 
 
     @Operation(

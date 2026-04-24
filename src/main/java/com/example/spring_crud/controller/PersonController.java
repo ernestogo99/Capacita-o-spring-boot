@@ -2,6 +2,7 @@ package com.example.spring_crud.controller;
 
 
 import com.example.spring_crud.dto.request.PersonRequestDTO;
+import com.example.spring_crud.dto.response.ApiResponseDTO;
 import com.example.spring_crud.dto.response.PersonResponseDTO;
 import com.example.spring_crud.entity.Person;
 import com.example.spring_crud.service.PersonService;
@@ -9,8 +10,13 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -72,6 +78,24 @@ public class PersonController implements PersonControllerDocs {
     @Override
     public ResponseEntity<PersonResponseDTO> updatePersonById(  @Parameter(description = "ID da pessoa") @PathVariable Long id, @RequestBody @Valid PersonRequestDTO personRequestDTO){
         PersonResponseDTO response=this.personService.updatePerson(id,personRequestDTO);
+        return ResponseEntity.ok(response);
+    }
+
+
+    @GetMapping(
+            value = "/with-pagination",
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    @Override
+    public ResponseEntity<ApiResponseDTO<PersonResponseDTO>> getAllPersonWithPagination(
+            @PageableDefault(
+                    size = 10,
+                    sort ="age",
+                    page = 0
+            ) Pageable pageable
+    ) {
+        ApiResponseDTO<PersonResponseDTO> response =
+                this.personService.getAllPersonWithPagination(pageable);
         return ResponseEntity.ok(response);
     }
 }
