@@ -899,15 +899,14 @@ com as outras camadas, isso deve ser respeitado para garantir que a api
 esteja escalável e fácil de manter.
 
 
-# Seção 2 (Paginação,Ordenação,Filtros e Busca avançada)
+# Seção 2 (Paginação)
 
-- [Paginação](#paginação)
-- [Ordenação](#ordenação)
-- [Filtros](#filtros)
-- [Busca avançada](#busca-avançada)
+- [Paginação](#Paginação)
+- [Autenticação](#Autenticação)
 
 
-# Paginação
+
+# Paginação 
 
 - Paginação é uma técnica usada para dividir grandes volumes de dados em partes menores (páginas),ao invés de retornar tudo de uma vez.
 
@@ -1051,5 +1050,40 @@ Agora no controller:
     }
 ```
 
+# Autenticação
+
+##Segurança e autenticação com Spring Security
+O que é Spring Security?
+
+O Spring Security é um framework responsável por adicionar mecanismos de segurança em aplicações Spring, permitindo controlar:
+
+- Quem pode acessar a aplicação (autenticação)
+- O que cada usuário pode acessar (autorização)
+- Proteção de endpoints
+- Controle de permissões
+- Integração com JWT, OAuth2, etc.
+
+
+Fluxo: 
+
+```Cliente
+   |
+   |
+POST /auth/login
+   |
+   |
+Spring Security
+   |
+   |
+Validação usuário/senha
+   |
+   |
+Gera JWT
+   |
+   |
+Cliente recebe token
+   |
+   |
+Envia token nas próximas requisições```
 
 
