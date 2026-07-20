@@ -898,192 +898,255 @@ Perceba que cada camada tem sua responsabilidade e que ela se conecta
 com as outras camadas, isso deve ser respeitado para garantir que a api 
 esteja escalável e fácil de manter.
 
+# Seção 2
 
-# Seção 2 (Paginação)
+## Table of Contents
 
-- [Paginação](#Paginação)
-- [Autenticação](#Autenticação)
+- [Paginação](#paginação)
+    - [O que é Paginação?](#o-que-é-paginação)
+    - [Como o Spring Boot implementa a paginação](#como-o-spring-boot-implementa-a-paginação)
+    - [Criando os DTOs de resposta](#criando-os-dtos-de-resposta)
+    - [Criando o Mapper](#criando-o-mapper)
+    - [Implementando no Service](#implementando-no-service)
+    - [Implementando no Controller](#implementando-no-controller)
+- [Autenticação com JWT](#autenticação-com-jwt)
+    - [O que é autenticação?](#o-que-é-autenticação)
+    - [Como funciona o JWT](#como-funciona-o-jwt)
+    - [Fluxo completo da autenticação](#fluxo-completo-da-autenticação)
+    - [Passo 1 – Criando a entidade User](#passo-1--criando-a-entidade-user)
+    - [Passo 2 – Criando o UserRepository](#passo-2--criando-o-userrepository)
+    - [Passo 3 – Criando os DTOs](#passo-3--criando-os-dtos)
+    - [Passo 4 – Criando o JWTService](#passo-4--criando-o-jwtservice)
+    - [Passo 5 – Criando o CustomUserDetailsService](#passo-5--criando-o-customuserdetailsservice)
+    - [Passo 6 – Criando o SecurityFilter](#passo-6--criando-o-securityfilter)
+    - [Passo 7 – Criando o SecurityConfig](#passo-7--criando-o-securityconfig)
+    - [Passo 8 – Criando o AuthService e AuthController](#passo-8--criando-o-authservice-e-authcontroller)
+    - [Passo 9 – Configurando o Swagger](#passo-9--configurando-o-swagger)
+    - [Resumo do fluxo](#resumo-do-fluxo)
 
+# Paginação
 
+## O que é Paginação?
 
-# Paginação 
+Paginação é uma técnica utilizada para dividir grandes quantidades de dados em pequenas partes (páginas), evitando que a API retorne todos os registros de uma única vez.
 
-- Paginação é uma técnica usada para dividir grandes volumes de dados em partes menores (páginas),ao invés de retornar tudo de uma vez.
+Benefícios:
 
-A paginação do java possui 3 parâmetros principais:
-- page: número de páginas
-- size: quantidade de registros por página
-- sort: ordenação dos dados
+- Melhor performance
+- Menor consumo de memória
+- Respostas mais rápidas
+- Melhor experiência para o cliente
 
+Exemplo:
 
-O spring resolve a paginação utilizando o seguinte:
-- Pageable: representa os parâmetros da página
-- Page<T>: representa o resultado paginado
+GET /pessoas?page=0&size=10&sort=age,asc
 
-Vamos criar dtos para padronizar as respostas da api com a paginação
+Onde:
 
+- page → número da página (começando em 0)
+- size → quantidade de registros
+- sort → campo e direção da ordenação
 
-```java
-public record SortFieldDTO(
-        String field,
-        String direction
-) {}
-```
+## Como o Spring Boot implementa a paginação
 
-```java
+O Spring Data JPA possui suporte nativo através de:
 
-public record PaginationResponseDTO(
-        Integer page,
-        Integer pageSize,
-        Long totalElements,
-        Integer totalPages,
-        List<SortFieldDTO> sort) {
+- Pageable → representa os parâmetros enviados pelo cliente.
+- Page<T> → representa a resposta paginada do banco.
 
-    public static PaginationResponseDTO fromPage(Page<?> page){
-        List<SortFieldDTO> sortFields = page.getSort()
-                .stream()
-                .map(order -> new SortFieldDTO(
-                        order.getProperty(),
-                        order.getDirection().name()
-                ))
-                .toList();
-        return  new PaginationResponseDTO(
-                page.getNumber(),
-                page.getSize(),
-                page.getTotalElements(),
-                page.getTotalPages(),   
-                sortFields
-        );
-    }
-}
+A partir daqui utilize exatamente os DTOs `SortFieldDTO`, `PaginationResponseDTO`, `ApiResponseDTO` e `ApiResponseMapper` desenvolvidos durante a capacitação.
 
-```
+Em seguida implemente:
 
+- Service utilizando `repository.findAll(pageable)`;
+- Controller utilizando `@PageableDefault`;
+- Documentação Swagger com `@ParameterObject`.
 
-Perceba que esse T é um tipo genérico, ou seja, podemos deixar essa resposta como padrão, para diversos tipos
-```java
-public record ApiResponseDTO<T>(
-        List<T> data,
-        PaginationResponseDTO pagination
-) {
-}
-```
+# Autenticação com JWT
 
-Devemos também fazer um mapper
-```java
+## O que é autenticação?
 
-public final class ApiResponseMapper {
+Autenticação é o processo responsável por confirmar a identidade do usuário.
 
-    private ApiResponseMapper(){
+Após informar e-mail e senha válidos, a aplicação gera um JWT (JSON Web Token). Esse token deverá acompanhar todas as próximas requisições protegidas.
 
-    }
+Exemplo:
 
-    public static <E, D> ApiResponseDTO<D> fromPage(
-            Page<E> page,
-            Function<E, D> mapper
-    ) {
-        List<D> data = page.getContent()
-                .stream()
-                .map(mapper)
-                .toList();
+Authorization: Bearer <token>
 
-        return new ApiResponseDTO<>(
-                data,
-                PaginationResponseDTO.fromPage(page)
-        );
-    }
-}
-```
+## Como funciona o JWT
 
+Fluxo:
 
+Cliente
 
-Assim iremos para o service e criaremos um método que retorna uma lista de pessoas com paginação
+↓
 
-```java
- public ApiResponseDTO<PersonResponseDTO> getAllPersonWithPagination(Pageable pageable) {
-        Page<Person> page = this.personRepository.findAll(pageable);
-
-        return ApiResponseMapper.fromPage(
-                page,
-                this.personMapper::toResponseDTO
-        );
-    }
-```
-
-
-Agora no controller:
-
-- na interface controllerdocs
-```java
- @Operation(
-            summary = "Listar pessoas com paginação e ordenação por campos",
-            description = "Retorna todas as pessoas cadastradas no sistema."
-    )
-    @ApiResponse(
-            responseCode = "200",
-            description = "Lista retornada com sucesso"
-    )
-    public ResponseEntity<ApiResponseDTO<PersonResponseDTO>> getAllPersonWithPagination(
-            @ParameterObject
-             Pageable pageable
-    );
-
-```
-
-- no controller
-```java
-  @GetMapping(
-            value = "/with-pagination",
-            produces = MediaType.APPLICATION_JSON_VALUE
-    )
-    @Override
-    public ResponseEntity<ApiResponseDTO<PersonResponseDTO>> getAllSystemsWithResult(
-            @PageableDefault(
-                    size = 10,
-                    sort ="age",
-                    page = 0
-            ) Pageable pageable
-    ) {
-        ApiResponseDTO<PersonResponseDTO> response =
-                this.personService.getAllPersonWithPagination(pageable);
-        return ResponseEntity.ok(response);
-    }
-```
-
-# Autenticação
-
-##Segurança e autenticação com Spring Security
-O que é Spring Security?
-
-O Spring Security é um framework responsável por adicionar mecanismos de segurança em aplicações Spring, permitindo controlar:
-
-- Quem pode acessar a aplicação (autenticação)
-- O que cada usuário pode acessar (autorização)
-- Proteção de endpoints
-- Controle de permissões
-- Integração com JWT, OAuth2, etc.
-
-
-Fluxo: 
-
-```Cliente
-   |
-   |
 POST /auth/login
-   |
-   |
-Spring Security
-   |
-   |
-Validação usuário/senha
-   |
-   |
-Gera JWT
-   |
-   |
-Cliente recebe token
-   |
-   |
-Envia token nas próximas requisições```
 
+↓
 
+AuthController
+
+↓
+
+AuthService
+
+↓
+
+UserRepository
+
+↓
+
+PasswordEncoder
+
+↓
+
+JWTService gera Token
+
+↓
+
+Cliente recebe JWT
+
+↓
+
+Próximas requisições
+
+↓
+
+SecurityFilter valida Token
+
+↓
+
+Spring Security libera acesso
+
+## Passo 1 – Criando a entidade User
+
+Crie a entidade responsável por representar os usuários da aplicação contendo id, nome, email e senha.
+
+## Passo 2 – Criando o UserRepository
+
+Crie um JpaRepository contendo o método:
+
+findByEmail(...)
+
+Esse método será utilizado tanto no login quanto na validação do token.
+
+## Passo 3 – Criando os DTOs
+
+Crie:
+
+- RegisterRequestDTO
+- LoginRequestDTO
+- LoginResponseDTO
+
+Esses DTOs representam as entradas e saídas dos endpoints de autenticação.
+
+## Passo 4 – Criando o JWTService
+
+Adicione a dependência java-jwt.
+
+O JWTService será responsável por:
+
+- gerar tokens;
+- validar tokens;
+- controlar a expiração.
+
+Também configure a chave secreta no application.properties:
+
+api.security.token.secret=my-secret-key
+
+## Passo 5 – Criando o CustomUserDetailsService
+
+Implemente a interface UserDetailsService.
+
+Sua responsabilidade é permitir que o Spring Security carregue um usuário a partir do e-mail.
+
+## Passo 6 – Criando o SecurityFilter
+
+O filtro é executado antes do controller.
+
+Responsabilidades:
+
+- recuperar Authorization;
+- extrair Bearer Token;
+- validar JWT;
+- localizar usuário;
+- registrar autenticação no SecurityContext.
+
+## Passo 7 – Criando o SecurityConfig
+
+Configure:
+
+- Stateless Session
+- PasswordEncoder
+- Endpoints públicos
+- Endpoints protegidos
+- SecurityFilter
+
+## Passo 8 – Criando o AuthService e AuthController
+
+AuthService
+
+Responsabilidades:
+
+- cadastrar usuários;
+- validar login;
+- criptografar senha;
+- gerar token JWT.
+
+AuthController
+
+Disponibiliza:
+
+POST /auth/register
+
+POST /auth/login
+
+## Passo 9 – Configurando o Swagger
+
+Configure um SecurityScheme Bearer para que seja possível utilizar o botão Authorize do Swagger.
+
+## Resumo do fluxo
+
+Usuário
+
+↓
+
+Login
+
+↓
+
+Controller
+
+↓
+
+Service
+
+↓
+
+Repository
+
+↓
+
+PasswordEncoder
+
+↓
+
+JWT
+
+↓
+
+Bearer Token
+
+↓
+
+SecurityFilter
+
+↓
+
+SecurityContext
+
+↓
+
+Controller protegido
