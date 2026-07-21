@@ -1024,6 +1024,29 @@ Spring Security libera acesso
 
 Crie a entidade responsável por representar os usuários da aplicação contendo id, nome, email e senha.
 
+```java
+
+@Table(name = "users")
+@Entity
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
+public class User {
+
+    @Id
+    @GeneratedValue(strategy=GenerationType.UUID)
+    @Setter(AccessLevel.NONE)
+    private String id;
+
+    private String name;
+
+    private String email;
+
+    private String password;
+}
+```
+
 ## Passo 2 – Criando o UserRepository
 
 Crie um JpaRepository contendo o método:
@@ -1031,6 +1054,16 @@ Crie um JpaRepository contendo o método:
 findByEmail(...)
 
 Esse método será utilizado tanto no login quanto na validação do token.
+
+
+```java
+public interface UserRepository extends JpaRepository<User, UUID> {
+
+
+    Optional<User> findByEmail(String email);
+}
+
+```
 
 ## Passo 3 – Criando os DTOs
 
@@ -1040,11 +1073,58 @@ Crie:
 - LoginRequestDTO
 - LoginResponseDTO
 
+```java
+
+public record LoginRequestDTO(
+
+        @NotBlank(message = "O email não pode ficar em branco")
+        @Email(message = "Formato de email inválido")
+        String email,
+
+        @NotBlank(message = "A senha não pode ficar em branco")
+        String password
+) {
+}
+```
+
+```java
+public record RegisterRequestDTO(
+        @NotBlank(message = "O nome não pode ficar em branco")
+        String name,
+
+        @NotBlank(message = "O email não pode ficar em branco")
+        @Email(message = "Formato de email inválido")
+        String email,
+
+        @NotBlank(message = "A senha não pode ficar em branco")
+        String password
+) {
+}
+```
+
+```java
+
+public record LoginResponseDTO(
+        String name,
+        String token
+) {
+}
+```
+
 Esses DTOs representam as entradas e saídas dos endpoints de autenticação.
 
 ## Passo 4 – Criando o JWTService
 
 Adicione a dependência java-jwt.
+
+```xml
+	<dependency>
+			<groupId>com.auth0</groupId>
+			<artifactId>java-jwt</artifactId>
+			<version>4.5.2</version>
+			<scope>compile</scope>
+		</dependency>
+```
 
 O JWTService será responsável por:
 
@@ -1056,11 +1136,73 @@ Também configure a chave secreta no application.properties:
 
 api.security.token.secret=my-secret-key
 
+
+```java
+
+@Service
+public class JWTService {
+
+    @Value("${api.security.token.secret}")
+    private String secret;
+
+    public String generateToken(User user){
+        try {
+            Algorithm algorithm= Algorithm.HMAC256(secret);
+
+            String token= JWT.create()
+                    .withIssuer("spring-crud")
+                    .withSubject(user.getEmail())
+                    .withExpiresAt(this.generateExpirationDate())
+                    .sign(algorithm);
+
+            return  token;
+        } catch (JWTCreationException e) {
+            throw new RuntimeException("Erro durante autenticação");
+        }
+    }
+
+    public String validateToken(String token){
+        try {
+            Algorithm algorithm= Algorithm.HMAC256(secret);
+            return JWT.require(algorithm)
+                    .withIssuer("spring-crud")
+                    .build()
+                    .verify(token)
+                    .getSubject();
+        }catch (JWTVerificationException e){
+            return  null;
+        }
+    }
+
+    private Instant generateExpirationDate(){
+        return LocalDateTime.now().plusHours(2).toInstant(ZoneOffset.of("-3"));
+    }
+}
+```
+
 ## Passo 5 – Criando o CustomUserDetailsService
 
 Implemente a interface UserDetailsService.
 
 Sua responsabilidade é permitir que o Spring Security carregue um usuário a partir do e-mail.
+
+```java
+@Service
+public class CustomUserDetailsService implements UserDetailsService {
+
+    private final UserRepository repository;
+
+    public CustomUserDetailsService(UserRepository repository){
+        this.repository=repository;
+    }
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        User user=this.repository.findByEmail(username).orElseThrow(()->new UsernameNotFoundException("Usuário não encontrado"));
+        return new org.springframework.security.core.userdetails.User(user.getEmail(), user.getPassword(), new ArrayList<>());
+    }
+}
+```
 
 ## Passo 6 – Criando o SecurityFilter
 
@@ -1074,6 +1216,46 @@ Responsabilidades:
 - localizar usuário;
 - registrar autenticação no SecurityContext.
 
+
+```java
+
+@Component
+public class SecurityFilter extends OncePerRequestFilter {
+
+
+    private JWTService jwtService;
+
+    private UserRepository userRepository;
+
+    public SecurityFilter(JWTService jwtService, UserRepository userRepository){
+        this.jwtService=jwtService;
+        this.userRepository=userRepository;
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+        String token=this.recoverToken(request);
+        String login= jwtService.validateToken(token);
+
+        if(login !=null){
+            User user= this.userRepository.findByEmail(login).orElseThrow(()->new PersonNotFoundException("Usuario não encontrado"));
+            List<SimpleGrantedAuthority> authorities= Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"));
+            var authentication= new UsernamePasswordAuthenticationToken(user,null,authorities);
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+        }
+        filterChain.doFilter(request,response);
+    }
+
+
+    private String recoverToken(HttpServletRequest request){
+        String authHeader = request.getHeader("Authorization");
+        if(authHeader==null) return  null;
+        return authHeader.replace("Bearer ", "");
+    }
+}
+
+```
+
 ## Passo 7 – Criando o SecurityConfig
 
 Configure:
@@ -1083,6 +1265,52 @@ Configure:
 - Endpoints públicos
 - Endpoints protegidos
 - SecurityFilter
+
+```java
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+
+    private CustomUserDetailsService userDetailsService;
+
+
+    private SecurityFilter securityFilter;
+
+    public SecurityConfig(CustomUserDetailsService userDetailsService,SecurityFilter securityFilter){
+        this.securityFilter=securityFilter;
+        this.userDetailsService=userDetailsService;
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(csrf -> csrf.disable())
+                .cors(Customizer.withDefaults())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/register").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+
+                        .anyRequest().authenticated()
+                )
+                .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class);
+        return http.build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+        return authenticationConfiguration.getAuthenticationManager();
+    }
+}
+```
 
 ## Passo 8 – Criando o AuthService e AuthController
 
@@ -1095,6 +1323,57 @@ Responsabilidades:
 - criptografar senha;
 - gerar token JWT.
 
+```java
+
+@Service
+public class AuthService {
+    private final UserRepository userRepository;
+
+    private final PasswordEncoder passwordEncoder;
+
+    private final JWTService jwtService;
+
+    private final AuthMapper authMapper;
+
+    public AuthService(AuthMapper authMapper,UserRepository userRepository,PasswordEncoder passwordEncoder,JWTService jwtService){
+        this.jwtService=jwtService;
+        this.authMapper=authMapper;
+        this.passwordEncoder=passwordEncoder;
+        this.userRepository=userRepository;
+    }
+
+    public LoginResponseDTO login(LoginRequestDTO loginRequestDTO){
+        User user=this.getUserByEmail(loginRequestDTO.email());
+        if(this.passwordEncoder.matches(loginRequestDTO.password(),user.getPassword())){
+            String token=this.jwtService.generateToken(user);
+            return new LoginResponseDTO(user.getName(),token );
+        }
+        throw  new SenhaIncorretaException();
+    }
+
+
+    public LoginResponseDTO signup(RegisterRequestDTO request){
+        String email = request.email();
+        Optional<User> existingUser = this.userRepository.findByEmail(email);
+
+        if(existingUser.isPresent()){
+            throw new DuplicateException(String.format("Usuário com o email '%s' já existe", email));
+        }
+        String hashedPassword = passwordEncoder.encode(request.password());
+        User user = this.authMapper.toEntity(request);
+        user.setPassword(hashedPassword);
+        this.userRepository.save(user);
+
+        String token=this.jwtService.generateToken(user);
+        return new LoginResponseDTO(user.getName(),token );
+    }
+
+    private User getUserByEmail(String email){
+        return this.userRepository.findByEmail(email).orElseThrow(()->new PersonNotFoundException("Usuário não encontrado"));
+    }
+}
+```
+
 AuthController
 
 Disponibiliza:
@@ -1103,9 +1382,70 @@ POST /auth/register
 
 POST /auth/login
 
+```java
+
+@RestController
+@RequestMapping("/auth")
+@Tag(name="Login")
+public class AuthController implements AuthControllerDocs {
+    private final AuthService authService;
+
+    public AuthController(AuthService authService){
+        this.authService=authService;
+    }
+
+    @Override
+    @PostMapping("/register")
+    public ResponseEntity<LoginResponseDTO> signup(
+            @RequestBody @Valid RegisterRequestDTO request
+    ) {
+
+        LoginResponseDTO response = authService.signup(request);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @Override
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponseDTO> login(
+            @RequestBody @Valid LoginRequestDTO request
+    ) {
+
+        LoginResponseDTO response = authService.login(request);
+
+        return ResponseEntity.ok(response);
+    }
+}
+
+```
+
 ## Passo 9 – Configurando o Swagger
 
 Configure um SecurityScheme Bearer para que seja possível utilizar o botão Authorize do Swagger.
+
+```java
+
+@Configuration
+public class SwaggerConfig {
+
+    @Bean
+    public OpenAPI customOpenAPI(){
+        return  new OpenAPI()
+                .info(new Info()
+                        .title("Spring-crud")
+                        .version("1.0")
+                        .description("Spring-crud api documentation"))
+                .components(new Components()
+                        .addSecuritySchemes("bearerAuth",new SecurityScheme()
+                                .name("bearerAuth")
+                                .type(SecurityScheme.Type.HTTP)
+                                .scheme("bearer")
+                                .bearerFormat("JWT")))
+                .addSecurityItem(new SecurityRequirement().addList("bearerAuth"));
+    }
+}
+
+```
 
 ## Resumo do fluxo
 
