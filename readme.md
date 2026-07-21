@@ -1150,3 +1150,232 @@ SecurityContext
 ↓
 
 Controller protegido
+
+
+# Relacionamentos entre Entidades no Spring Boot (JPA)
+
+Nesta seção, iremos apresentar os relacionamentos possíveis entre entidades,
+dando exemplos de código, contudo, não iremos implementar no nosso projeto, por enquanto......
+
+
+Em bancos de dados relacionais, 
+é comum que uma entidade esteja relacionada a outra. 
+O JPA fornece anotações para representar esses relacionamentos diretamente nas entidades Java.
+
+Os quatro principais relacionamentos são:
+
+- @OneToOne 
+- @OneToMany
+- @ManyToOne
+- @ManyToMany
+
+
+## OneToOne
+
+Representa um relacionamento onde um registro possui apenas um registro associado.
+
+Exemplo: Uma pessoa possui apenas um passaporte
+
+```java
+
+@Entity
+public class Passport {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String number;
+}
+```
+
+
+
+```java
+@Entity
+public class Person {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+
+    @OneToOne
+    @JoinColumn(name = "passport_id")
+    private Passport passport;
+}
+```
+As anotações no código fazem o seguinte
+
+- OneToOne: Indica que existe exatamente um objeto relacionado.
+- Joincolumn: Define qual coluna será criada como chave estrangeira.
+
+nesse exemplo será criada:
+
+```
+person
+
+id
+name
+passport_id
+```
+
+## OneToMany(Um para muitos)
+
+Um registro possui vários registros associados.
+
+Exemplo:  Um departamento possui vários funcionários.
+
+
+```java
+@Entity
+public class Department {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+
+    @OneToMany(mappedBy = "department")
+    private List<Employee> employees;
+}
+```
+
+```java
+@Entity
+public class Employee {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+
+    @ManyToOne
+    @JoinColumn(name = "department_id")
+    private Department department;
+}
+```
+
+- mappedBy: Significa que quem realmente possui a chave estrangeira é o atributo department da entidade Employee.
+
+
+
+## ManyToOne(Muitos para um)
+
+Vários registros pertencem ao mesmo registro.
+Como vimos no exemplo anterior, na entidade employee
+temos o relacionamento manyToOne,pois varios funcionarios podem estar
+relacionados a um departamento.
+
+```java
+@ManyToOne
+@JoinColumn(name = "department_id")
+private Department department;
+```
+
+## ManyToMany(Muitos para muitos)
+
+Quando vários registros podem possuir vários outros registros.
+
+Exemplo: Alunos e curso
+Vários alunos fazem vários cursos
+Vários cursos possuem vários alunos
+
+
+```java
+@Entity
+public class Student {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+
+    @ManyToMany
+    @JoinTable(
+        name = "student_course",
+        joinColumns = @JoinColumn(name = "student_id"),
+        inverseJoinColumns = @JoinColumn(name = "course_id")
+    )
+    private List<Course> courses;
+}
+```
+
+
+```java
+@Entity
+public class Course {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+
+    @ManyToMany(mappedBy = "courses")
+    private List<Student> students;
+}
+```
+
+
+nesse caso o jpa cria automaticamente uma tabela intermediaria
+
+```
+student_course
+
+student_id
+course_id
+
+```
+
+
+- Jointable: É utilizado quando existe uma tabela intermediária
+
+
+FetchType
+
+Controla quando o relacionamento será carregado.
+
+FetchType.LAZY
+
+Carrega o relacionamento apenas quando ele for utilizado.
+
+CascadeType
+
+Define quais operações realizadas na entidade principal serão propagadas para a entidade relacionada.
+
+```java
+@OneToMany(fetch = FetchType.LAZY)
+private List<Employee> employees;
+```
+
+
+# Resumo
+
+| Anotação | Significado | Exemplo |
+|----------|------------|----------|
+| `@OneToOne` | Um registro possui exatamente um relacionado | Pessoa → Passaporte |
+| `@OneToMany` | Um registro possui vários relacionados | Departamento → Funcionários |
+| `@ManyToOne` | Vários registros pertencem ao mesmo registro | Funcionário → Departamento |
+| `@ManyToMany` | Muitos registros se relacionam com muitos registros | Alunos ↔ Cursos |
+| `@JoinColumn` | Define a chave estrangeira | `department_id` |
+| `@JoinTable` | Define a tabela intermediária | `student_course` |
+| `FetchType.LAZY` | Carrega os dados apenas quando necessário | Melhor desempenho |
+| `FetchType.EAGER` | Carrega tudo imediatamente | Pode reduzir a performance |
+| `CascadeType` | Propaga operações entre entidades | Salvar, atualizar e remover automaticamente |
+| `orphanRemoval` | Remove entidades órfãs automaticamente | Exclui filhos removidos da coleção |
+
+---
+
+## Boas práticas
+
+- Utilize **`FetchType.LAZY`** como padrão para coleções (`@OneToMany` e `@ManyToMany`).
+- Utilize **`FetchType.EAGER`** apenas quando o relacionamento sempre será necessário.
+- Use **`CascadeType.ALL`** somente quando a entidade filha depender totalmente da entidade pai.
+- Utilize **`orphanRemoval = true`** apenas quando a entidade filha não puder existir sem a entidade principal.
+- Evite relacionamentos bidirecionais desnecessários, pois eles aumentam a complexidade do modelo e podem causar problemas de serialização em APIs REST.
+
