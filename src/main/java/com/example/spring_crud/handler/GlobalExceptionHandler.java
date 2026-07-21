@@ -4,7 +4,9 @@ package com.example.spring_crud.handler;
 import com.example.spring_crud.dto.response.ExceptionResponseDTO;
 import com.example.spring_crud.dto.response.FieldError;
 import com.example.spring_crud.exception.CpfJaCadastradoException;
+import com.example.spring_crud.exception.DuplicateException;
 import com.example.spring_crud.exception.PersonNotFoundException;
+import com.example.spring_crud.exception.SenhaIncorretaException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -61,4 +63,27 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(exceptionDTO);
 
     }
+
+   @ExceptionHandler(DuplicateException.class)
+    public ResponseEntity<ExceptionResponseDTO> threatDuplicateException(DuplicateException exception){
+        ExceptionResponseDTO exceptionResponseDTO= new ExceptionResponseDTO(
+                null,
+                HttpStatus.CONFLICT.toString(),
+                exception.getMessage()
+        );
+        return  ResponseEntity.status(HttpStatus.CONFLICT).body(exceptionResponseDTO);
+   }
+
+
+    @ExceptionHandler(SenhaIncorretaException.class)
+    public ResponseEntity<ExceptionResponseDTO> threatWrongPasswordException(SenhaIncorretaException exception){
+        ExceptionResponseDTO exceptionResponseDTO= new ExceptionResponseDTO(
+                null,
+                HttpStatus.CONFLICT.toString(),
+                exception.getMessage()
+        );
+        return  ResponseEntity.status(HttpStatus.CONFLICT).body(exceptionResponseDTO);
+    }
+
+
 }

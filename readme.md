@@ -6,7 +6,7 @@ O objetivo dessa capacitação é ensinar como criar uma api em spring boot util
 ![Postgres](https://img.shields.io/badge/postgres-%234D6A9C.svg?style=for-the-badge&logo=postgresql&logoColor=white)
 ![Java](https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
 ![Spring](https://img.shields.io/badge/SpringBoot-6DB33F?style=flat-square&logo=Spring&logoColor=white)
-## Tabela de conteúdos
+## Seção 1 (Crud básico)
 
 - [O que é o Spring Boot?](#o-que-é-o-spring-boot)
 - [Como criar um projeto em Java com Spring Boot](#como-criar-um-projeto-em-java-com-spring-boot)
@@ -888,7 +888,7 @@ public class GlobalExceptionHandler {
 
 ## Resumo
 
-Finalizando a capacitação, vemos que o fluxo que seguimos foi
+Finalizando a seção 1, vemos que o fluxo que seguimos foi
 
 entity -> dto -> mapper -> repository -> service -> controller
 
@@ -897,3 +897,485 @@ além das exceções personalizadas e do tratamento de exceções
 Perceba que cada camada tem sua responsabilidade e que ela se conecta
 com as outras camadas, isso deve ser respeitado para garantir que a api 
 esteja escalável e fácil de manter.
+
+# Seção 2
+
+## Table of Contents
+
+- [Paginação](#paginação)
+    - [O que é Paginação?](#o-que-é-paginação)
+    - [Como o Spring Boot implementa a paginação](#como-o-spring-boot-implementa-a-paginação)
+    - [Criando os DTOs de resposta](#criando-os-dtos-de-resposta)
+    - [Criando o Mapper](#criando-o-mapper)
+    - [Implementando no Service](#implementando-no-service)
+    - [Implementando no Controller](#implementando-no-controller)
+- [Autenticação com JWT](#autenticação-com-jwt)
+    - [O que é autenticação?](#o-que-é-autenticação)
+    - [Como funciona o JWT](#como-funciona-o-jwt)
+    - [Fluxo completo da autenticação](#fluxo-completo-da-autenticação)
+    - [Passo 1 – Criando a entidade User](#passo-1--criando-a-entidade-user)
+    - [Passo 2 – Criando o UserRepository](#passo-2--criando-o-userrepository)
+    - [Passo 3 – Criando os DTOs](#passo-3--criando-os-dtos)
+    - [Passo 4 – Criando o JWTService](#passo-4--criando-o-jwtservice)
+    - [Passo 5 – Criando o CustomUserDetailsService](#passo-5--criando-o-customuserdetailsservice)
+    - [Passo 6 – Criando o SecurityFilter](#passo-6--criando-o-securityfilter)
+    - [Passo 7 – Criando o SecurityConfig](#passo-7--criando-o-securityconfig)
+    - [Passo 8 – Criando o AuthService e AuthController](#passo-8--criando-o-authservice-e-authcontroller)
+    - [Passo 9 – Configurando o Swagger](#passo-9--configurando-o-swagger)
+    - [Resumo do fluxo](#resumo-do-fluxo)
+
+# Paginação
+
+## O que é Paginação?
+
+Paginação é uma técnica utilizada para dividir grandes quantidades de dados em pequenas partes (páginas), evitando que a API retorne todos os registros de uma única vez.
+
+Benefícios:
+
+- Melhor performance
+- Menor consumo de memória
+- Respostas mais rápidas
+- Melhor experiência para o cliente
+
+Exemplo:
+
+GET /pessoas?page=0&size=10&sort=age,asc
+
+Onde:
+
+- page → número da página (começando em 0)
+- size → quantidade de registros
+- sort → campo e direção da ordenação
+
+## Como o Spring Boot implementa a paginação
+
+O Spring Data JPA possui suporte nativo através de:
+
+- Pageable → representa os parâmetros enviados pelo cliente.
+- Page<T> → representa a resposta paginada do banco.
+
+A partir daqui utilize exatamente os DTOs `SortFieldDTO`, `PaginationResponseDTO`, `ApiResponseDTO` e `ApiResponseMapper` desenvolvidos durante a capacitação.
+
+Em seguida implemente:
+
+- Service utilizando `repository.findAll(pageable)`;
+- Controller utilizando `@PageableDefault`;
+- Documentação Swagger com `@ParameterObject`.
+
+# Autenticação com JWT
+
+## O que é autenticação?
+
+Autenticação é o processo responsável por confirmar a identidade do usuário.
+
+Após informar e-mail e senha válidos, a aplicação gera um JWT (JSON Web Token). Esse token deverá acompanhar todas as próximas requisições protegidas.
+
+Exemplo:
+
+Authorization: Bearer <token>
+
+## Como funciona o JWT
+
+Fluxo:
+
+Cliente
+
+↓
+
+POST /auth/login
+
+↓
+
+AuthController
+
+↓
+
+AuthService
+
+↓
+
+UserRepository
+
+↓
+
+PasswordEncoder
+
+↓
+
+JWTService gera Token
+
+↓
+
+Cliente recebe JWT
+
+↓
+
+Próximas requisições
+
+↓
+
+SecurityFilter valida Token
+
+↓
+
+Spring Security libera acesso
+
+## Passo 1 – Criando a entidade User
+
+Crie a entidade responsável por representar os usuários da aplicação contendo id, nome, email e senha.
+
+## Passo 2 – Criando o UserRepository
+
+Crie um JpaRepository contendo o método:
+
+findByEmail(...)
+
+Esse método será utilizado tanto no login quanto na validação do token.
+
+## Passo 3 – Criando os DTOs
+
+Crie:
+
+- RegisterRequestDTO
+- LoginRequestDTO
+- LoginResponseDTO
+
+Esses DTOs representam as entradas e saídas dos endpoints de autenticação.
+
+## Passo 4 – Criando o JWTService
+
+Adicione a dependência java-jwt.
+
+O JWTService será responsável por:
+
+- gerar tokens;
+- validar tokens;
+- controlar a expiração.
+
+Também configure a chave secreta no application.properties:
+
+api.security.token.secret=my-secret-key
+
+## Passo 5 – Criando o CustomUserDetailsService
+
+Implemente a interface UserDetailsService.
+
+Sua responsabilidade é permitir que o Spring Security carregue um usuário a partir do e-mail.
+
+## Passo 6 – Criando o SecurityFilter
+
+O filtro é executado antes do controller.
+
+Responsabilidades:
+
+- recuperar Authorization;
+- extrair Bearer Token;
+- validar JWT;
+- localizar usuário;
+- registrar autenticação no SecurityContext.
+
+## Passo 7 – Criando o SecurityConfig
+
+Configure:
+
+- Stateless Session
+- PasswordEncoder
+- Endpoints públicos
+- Endpoints protegidos
+- SecurityFilter
+
+## Passo 8 – Criando o AuthService e AuthController
+
+AuthService
+
+Responsabilidades:
+
+- cadastrar usuários;
+- validar login;
+- criptografar senha;
+- gerar token JWT.
+
+AuthController
+
+Disponibiliza:
+
+POST /auth/register
+
+POST /auth/login
+
+## Passo 9 – Configurando o Swagger
+
+Configure um SecurityScheme Bearer para que seja possível utilizar o botão Authorize do Swagger.
+
+## Resumo do fluxo
+
+Usuário
+
+↓
+
+Login
+
+↓
+
+Controller
+
+↓
+
+Service
+
+↓
+
+Repository
+
+↓
+
+PasswordEncoder
+
+↓
+
+JWT
+
+↓
+
+Bearer Token
+
+↓
+
+SecurityFilter
+
+↓
+
+SecurityContext
+
+↓
+
+Controller protegido
+
+
+# Relacionamentos entre Entidades no Spring Boot (JPA)
+
+Nesta seção, iremos apresentar os relacionamentos possíveis entre entidades,
+dando exemplos de código, contudo, não iremos implementar no nosso projeto, por enquanto......
+
+
+Em bancos de dados relacionais, 
+é comum que uma entidade esteja relacionada a outra. 
+O JPA fornece anotações para representar esses relacionamentos diretamente nas entidades Java.
+
+Os quatro principais relacionamentos são:
+
+- @OneToOne 
+- @OneToMany
+- @ManyToOne
+- @ManyToMany
+
+
+## OneToOne
+
+Representa um relacionamento onde um registro possui apenas um registro associado.
+
+Exemplo: Uma pessoa possui apenas um passaporte
+
+```java
+
+@Entity
+public class Passport {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String number;
+}
+```
+
+
+
+```java
+@Entity
+public class Person {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+
+    @OneToOne
+    @JoinColumn(name = "passport_id")
+    private Passport passport;
+}
+```
+As anotações no código fazem o seguinte
+
+- OneToOne: Indica que existe exatamente um objeto relacionado.
+- Joincolumn: Define qual coluna será criada como chave estrangeira.
+
+nesse exemplo será criada:
+
+```
+person
+
+id
+name
+passport_id
+```
+
+## OneToMany(Um para muitos)
+
+Um registro possui vários registros associados.
+
+Exemplo:  Um departamento possui vários funcionários.
+
+
+```java
+@Entity
+public class Department {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+
+    @OneToMany(mappedBy = "department")
+    private List<Employee> employees;
+}
+```
+
+```java
+@Entity
+public class Employee {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+
+    @ManyToOne
+    @JoinColumn(name = "department_id")
+    private Department department;
+}
+```
+
+- mappedBy: Significa que quem realmente possui a chave estrangeira é o atributo department da entidade Employee.
+
+
+
+## ManyToOne(Muitos para um)
+
+Vários registros pertencem ao mesmo registro.
+Como vimos no exemplo anterior, na entidade employee
+temos o relacionamento manyToOne,pois varios funcionarios podem estar
+relacionados a um departamento.
+
+```java
+@ManyToOne
+@JoinColumn(name = "department_id")
+private Department department;
+```
+
+## ManyToMany(Muitos para muitos)
+
+Quando vários registros podem possuir vários outros registros.
+
+Exemplo: Alunos e curso
+Vários alunos fazem vários cursos
+Vários cursos possuem vários alunos
+
+
+```java
+@Entity
+public class Student {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+
+    @ManyToMany
+    @JoinTable(
+        name = "student_course",
+        joinColumns = @JoinColumn(name = "student_id"),
+        inverseJoinColumns = @JoinColumn(name = "course_id")
+    )
+    private List<Course> courses;
+}
+```
+
+
+```java
+@Entity
+public class Course {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+
+    @ManyToMany(mappedBy = "courses")
+    private List<Student> students;
+}
+```
+
+
+nesse caso o jpa cria automaticamente uma tabela intermediaria
+
+```
+student_course
+
+student_id
+course_id
+
+```
+
+
+- Jointable: É utilizado quando existe uma tabela intermediária
+
+
+FetchType
+
+Controla quando o relacionamento será carregado.
+
+FetchType.LAZY
+
+Carrega o relacionamento apenas quando ele for utilizado.
+
+CascadeType
+
+Define quais operações realizadas na entidade principal serão propagadas para a entidade relacionada.
+
+```java
+@OneToMany(fetch = FetchType.LAZY)
+private List<Employee> employees;
+```
+
+
+# Resumo
+
+| Anotação | Significado | Exemplo |
+|----------|------------|----------|
+| `@OneToOne` | Um registro possui exatamente um relacionado | Pessoa → Passaporte |
+| `@OneToMany` | Um registro possui vários relacionados | Departamento → Funcionários |
+| `@ManyToOne` | Vários registros pertencem ao mesmo registro | Funcionário → Departamento |
+| `@ManyToMany` | Muitos registros se relacionam com muitos registros | Alunos ↔ Cursos |
+| `@JoinColumn` | Define a chave estrangeira | `department_id` |
+| `@JoinTable` | Define a tabela intermediária | `student_course` |
+| `FetchType.LAZY` | Carrega os dados apenas quando necessário | Melhor desempenho |
+| `FetchType.EAGER` | Carrega tudo imediatamente | Pode reduzir a performance |
+| `CascadeType` | Propaga operações entre entidades | Salvar, atualizar e remover automaticamente |
+| `orphanRemoval` | Remove entidades órfãs automaticamente | Exclui filhos removidos da coleção |
+
+---
+
+## Boas práticas
+
+- Utilize **`FetchType.LAZY`** como padrão para coleções (`@OneToMany` e `@ManyToMany`).
+- Utilize **`FetchType.EAGER`** apenas quando o relacionamento sempre será necessário.
+- Use **`CascadeType.ALL`** somente quando a entidade filha depender totalmente da entidade pai.
+- Utilize **`orphanRemoval = true`** apenas quando a entidade filha não puder existir sem a entidade principal.
+- Evite relacionamentos bidirecionais desnecessários, pois eles aumentam a complexidade do modelo e podem causar problemas de serialização em APIs REST.
+
